@@ -2,7 +2,22 @@ require('dotenv').config({ path: '.env.local' });
 
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const { kv } = require('@vercel/kv');
+
+const APP_PASSWORD = process.env.APP_PASSWORD;
+
+function makeToken() {
+  return crypto.createHash('sha256').update(APP_PASSWORD + ':status-dashboard').digest('hex');
+}
+
+function requireAuth(req, res, next) {
+  if (!APP_PASSWORD) return next();
+  const auth = req.headers['authorization'] || '';
+  const token = auth.replace('Bearer ', '').trim();
+  if (token !== makeToken()) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -124,7 +139,14 @@ async function save(data) {
   console.log('✓ Data saved to Vercel KV');
 }
 
-app.post('/api/save', async (req, res) => {
+app.post('/api/auth', (req, res) => {
+  if (!APP_PASSWORD) return res.json({ token: null });
+  const { password } = req.body;
+  if (password !== APP_PASSWORD) return res.status(401).json({ error: 'Invalid password' });
+  res.json({ token: makeToken() });
+});
+
+app.post('/api/save', requireAuth, async (req, res) => {
   try {
     await save(req.body);
     res.json({ success: true });
@@ -134,7 +156,7 @@ app.post('/api/save', async (req, res) => {
   }
 });
 
-app.get('/api/load', async (req, res) => {
+app.get('/api/load', requireAuth, async (req, res) => {
   try {
     const data = await load();
     res.json(data || {});
