@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -137,8 +137,13 @@ app.get('/api/load', (req, res) => {
   res.json(data || {});
 });
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`\n📊 Status Dashboard Server running at http://localhost:${PORT}\n`);
-  console.log(`✓ Open your browser to: http://localhost:${PORT}/status_dashboard.html`);
+  // console.log(`✓ Open your browser to: http://localhost:${PORT}/status_dashboard.html`);
+  console.log(`✓ Open your browser to: http://localhost:${PORT}`);
   console.log(`✓ Data will auto-save to: ${MARKDOWN_FILE}\n`);
 });
