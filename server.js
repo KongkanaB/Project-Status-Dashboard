@@ -1,149 +1,158 @@
+require('dotenv').config({ path: '.env.local' });
+
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
+const { kv } = require('@vercel/kv');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const KV_KEY = 'dashboard:data';
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
-const MARKDOWN_FILE = path.join(__dirname, 'status_dashboard.md');
+// Seed data migrated from status_dashboard.md
+const SEED_DATA = {
+  "meta": {
+    "period": "Week of 18/05/2026",
+    "author": "Kongkana Bayan",
+    "distribution": "Sanjoy, Dibya, Gyan, Champak",
+    "issued": "",
+    "execSummary": "All 2 projects are tracking well (Green/Blue). No critical blockers or pending decisions.",
+    "sprintStart": "2026-05-18",
+    "sprintEnd": "2026-05-29"
+  },
+  "projects": [
+    {
+      "id": "yyxahx39",
+      "name": "Self Nomination Enhancement - Backend",
+      "owner": "Sanjoy Debnath",
+      "milestone": "In development",
+      "rag": "Green",
+      "pct": 75,
+      "notes": "",
+      "jiraTicket": "https://vantagecirclejira.atlassian.net/browse/VC-16072"
+    },
+    {
+      "id": "tknftvrz",
+      "name": "Self Nomination Enhancement - Frontend",
+      "owner": "Dibya Choudhury",
+      "milestone": "In development",
+      "rag": "Red",
+      "pct": 50,
+      "notes": "",
+      "jiraTicket": "https://vantagecirclejira.atlassian.net/browse/VC-16098"
+    }
+  ],
+  "completed": [],
+  "upcoming": [
+    {
+      "id": "hrkbofih",
+      "priority": "P1 - High",
+      "project": "MBRDI - Approval App API Integration",
+      "milestone": "Not started",
+      "task": "API Integration",
+      "owner": "Gyanangkush Borgohain",
+      "target": "2026-06-30",
+      "dependencies": "Commercial to be finalised by PX Team and Client",
+      "status": "Not started"
+    },
+    {
+      "id": "ohh8vugk",
+      "priority": "P1 - High",
+      "project": "Amdocs SYB Customisation",
+      "milestone": "Not started",
+      "task": "SYB Customisation",
+      "owner": "Champak Barman",
+      "target": "2026-06-09",
+      "dependencies": "Pending information not shared by Nitika",
+      "status": "Not started"
+    }
+  ],
+  "blockers": [],
+  "milestones": [
+    {
+      "id": "nim10ryp",
+      "project": "Self Nomination Enhancement - Backend",
+      "milestone": "In development",
+      "stage": "In Review",
+      "owner": "Sanjoy Debnath",
+      "start": "2026-05-18",
+      "target": "2026-05-22",
+      "actual": "",
+      "status": "On track",
+      "notes": ""
+    },
+    {
+      "id": "accjasue",
+      "project": "Self Nomination Enhancement - Frontend",
+      "milestone": "In development",
+      "stage": "In Dev",
+      "owner": "Dibya Choudhury",
+      "start": "2026-05-19",
+      "target": "2026-05-20",
+      "actual": "",
+      "status": "Delayed",
+      "notes": ""
+    }
+  ],
+  "decisions": [
+    {
+      "id": "hb6jxz4v",
+      "project": "MBRDI - Approval App API Integration",
+      "decision": "The objective of this integration is to enable approvers from the Mercedes-Benz system to securely view and take action on external award approvals app through API-based communication with Vantage Circle.",
+      "owner": "Anjan Pathak",
+      "needed": "2026-05-15",
+      "status": "Decided"
+    }
+  ],
+  "archive": []
+};
 
-// Load data from markdown
-function loadFromMarkdown() {
-  if (!fs.existsSync(MARKDOWN_FILE)) {
-    return null;
+async function load() {
+  const data = await kv.get(KV_KEY);
+  if (!data) {
+    await kv.set(KV_KEY, SEED_DATA);
+    console.log('✓ Seeded Vercel KV with existing dashboard data');
+    return SEED_DATA;
   }
+  return data;
+}
+
+async function save(data) {
+  await kv.set(KV_KEY, data);
+  console.log('✓ Data saved to Vercel KV');
+}
+
+app.post('/api/save', async (req, res) => {
   try {
-    const content = fs.readFileSync(MARKDOWN_FILE, 'utf8');
-    const match = content.match(/```json\n([\s\S]*?)\n```/);
-    if (match) {
-      return JSON.parse(match[1]);
-    }
+    await save(req.body);
+    res.json({ success: true });
   } catch (e) {
-    console.error('Error loading markdown:', e.message);
+    console.error('Error saving to KV:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
-  return null;
-}
-
-// Helper to format date from YYYY-MM-DD to DD/MM/YYYY
-function formatDate(dateStr) {
-  if (!dateStr) return 'N/A';
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
-}
-
-// Save data to markdown
-function saveToMarkdown(data) {
-  try {
-    const timestamp = new Date().toISOString();
-    let markdown = `# Weekly Project Status Dashboard\n\n`;
-    markdown += `**Last Updated:** ${timestamp}\n\n`;
-
-    if (data.meta) {
-      markdown += `## Metadata\n\n`;
-      markdown += `- **Reporting Period:** ${data.meta.period || 'N/A'}\n`;
-      markdown += `- **Prepared By:** ${data.meta.author || 'N/A'}\n`;
-      markdown += `- **Sprint Start Date:** ${formatDate(data.meta.sprintStart)}\n`;
-      markdown += `- **Sprint End Date:** ${formatDate(data.meta.sprintEnd)}\n\n`;
-
-      if (data.meta.execSummary) {
-        markdown += `## Executive Summary\n\n${data.meta.execSummary}\n\n`;
-      }
-    }
-
-    if (data.projects && data.projects.length > 0) {
-      markdown += `## Projects\n\n`;
-      markdown += `| Project | Owner | Phase | RAG | % | JIRA Ticket | Notes |\n`;
-      markdown += `|---------|-------|-------|-----|---|-------------|-------|\n`;
-      data.projects.forEach(p => {
-        markdown += `| ${p.name || ''} | ${p.owner || ''} | ${p.milestone || ''} | ${p.rag || ''} | ${p.pct || 0}% | ${p.jiraTicket || ''} | ${p.notes || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    if (data.completed && data.completed.length > 0) {
-      markdown += `## Completed This Week\n\n`;
-      markdown += `| Project | Milestone | Task | Owner | Date | Outcome |\n`;
-      markdown += `|---------|-----------|------|-------|------|----------|\n`;
-      data.completed.forEach(x => {
-        markdown += `| ${x.project || ''} | ${x.milestone || ''} | ${x.task || ''} | ${x.owner || ''} | ${x.date || ''} | ${x.outcome || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    if (data.upcoming && data.upcoming.length > 0) {
-      markdown += `## Upcoming Priorities\n\n`;
-      markdown += `| Priority | Project | Milestone | Task | Owner | Target | Dependencies | Status |\n`;
-      markdown += `|----------|---------|-----------|------|-------|--------|---------------|---------|\n`;
-      data.upcoming.forEach(x => {
-        markdown += `| ${x.priority || ''} | ${x.project || ''} | ${x.milestone || ''} | ${x.task || ''} | ${x.owner || ''} | ${x.target || ''} | ${x.dependencies || ''} | ${x.status || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    if (data.blockers && data.blockers.length > 0) {
-      markdown += `## Active Blockers & Risks\n\n`;
-      markdown += `| Project | Milestone | Description | Severity | Owner | Ask | Target |\n`;
-      markdown += `|---------|-----------|-------------|----------|-------|-----|--------|\n`;
-      data.blockers.forEach(x => {
-        const desc = (x.description || '').replace(/\|/g, '\\|');
-        const ask = (x.ask || '').replace(/\|/g, '\\|');
-        markdown += `| ${x.project || ''} | ${x.milestone || ''} | ${desc} | ${x.severity || ''} | ${x.owner || ''} | ${ask} | ${x.target || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    if (data.milestones && data.milestones.length > 0) {
-      markdown += `## Milestones\n\n`;
-      markdown += `| Project | Milestone | Stage | Owner | Start | Target | Status | Notes |\n`;
-      markdown += `|---------|-----------|-------|-------|-------|--------|--------|-------|\n`;
-      data.milestones.forEach(x => {
-        markdown += `| ${x.project || ''} | ${x.milestone || ''} | ${x.stage || ''} | ${x.owner || ''} | ${x.start || ''} | ${x.target || ''} | ${x.status || ''} | ${x.notes || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    if (data.decisions && data.decisions.length > 0) {
-      markdown += `## Decisions Needed\n\n`;
-      markdown += `| Project | Decision | Owner | Needed By | Status |\n`;
-      markdown += `|---------|----------|-------|-----------|--------|\n`;
-      data.decisions.forEach(x => {
-        const decision = (x.decision || '').replace(/\|/g, '\\|');
-        markdown += `| ${x.project || ''} | ${decision} | ${x.owner || ''} | ${x.needed || ''} | ${x.status || ''} |\n`;
-      });
-      markdown += `\n`;
-    }
-
-    markdown += `\n## Raw Data\n\n`;
-    markdown += `\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n`;
-
-    fs.writeFileSync(MARKDOWN_FILE, markdown, 'utf8');
-    console.log(`✓ Data saved to ${MARKDOWN_FILE}`);
-  } catch (e) {
-    console.error('Error saving markdown:', e.message);
-  }
-}
-
-// API endpoint to save data
-app.post('/api/save', (req, res) => {
-  saveToMarkdown(req.body);
-  res.json({ success: true });
 });
 
-// API endpoint to load data
-app.get('/api/load', (req, res) => {
-  const data = loadFromMarkdown();
-  res.json(data || {});
+app.get('/api/load', async (req, res) => {
+  try {
+    const data = await load();
+    res.json(data || {});
+  } catch (e) {
+    console.error('Error loading from KV:', e.message);
+    res.status(500).json({});
+  }
 });
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`\n📊 Status Dashboard Server running at http://localhost:${PORT}\n`);
-  // console.log(`✓ Open your browser to: http://localhost:${PORT}/status_dashboard.html`);
-  console.log(`✓ Open your browser to: http://localhost:${PORT}`);
-  console.log(`✓ Data will auto-save to: ${MARKDOWN_FILE}\n`);
-});
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`\n📊 Status Dashboard running at http://localhost:${PORT}`);
+    console.log(`✓ Storage: Vercel KV (key: ${KV_KEY})\n`);
+  });
+}
