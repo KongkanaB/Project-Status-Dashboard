@@ -1,0 +1,13 @@
+{
+  "name": "status-dashboard",
+  "version": "1.0.0",
+  "description": "Weekly Project Status Dashboard with Markdown auto-save",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

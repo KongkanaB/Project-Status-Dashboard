@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Weekly Project Status Dashboard</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f6f8fb;
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1f3864 0%, #2f5597 100%);
+    color: white;
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  .header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0.3px; }
+  .header .subtitle { opacity: 0.85; font-size: 13px; }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .meta-field { display: flex; flex-direction: column; gap: 2px; }
+  .meta-field label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .meta-field input {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    color: white;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .meta-field input::placeholder { color: rgba(255,255,255,0.6); }
+
+  /* KPI strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .kpi {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .kpi .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi .value { font-size: 24px; font-weight: 600; color: #1f3864; }
+  .kpi .sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+  .kpi[onclick] { cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+  .kpi[onclick]:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    color: #6b7280;
+    font-weight: 500;
+    white-space: nowrap;
+    background: none;
+    border-top: none; border-left: none; border-right: none;
+    font-size: 13px;
+  }
+  .tab:hover { color: #1f3864; }
+  .tab.active { color: #1f3864; border-bottom-color: #2f5597; }
+
+  /* Panel */
+  .panel {
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .panel-title { font-size: 16px; font-weight: 600; color: #1f3864; }
+  .panel-hint { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 8px 10px;
+    background: #f3f4f6;
+    color: #374151;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:hover td { background: #fafbfc; }
+  .empty {
+    padding: 32px;
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .rag-Green, .stage-Done, .status-Complete, .status-OnTrack, .status-Decided { background: #e2efda; color: #2d5016; }
+  .rag-Amber, .stage-ReadyForDev, .status-AtRisk, .status-Open { background: #fff2cc; color: #7c5e00; }
+  .rag-Red, .stage-InDev, .status-Blocked, .status-Delayed, .sev-High { background: #fce4d6; color: #8b2c0d; }
+  .rag-Blue, .stage-InReview, .status-InProgress, .status-InReview { background: #ddebf7; color: #1f3864; }
+  .stage-Backlog, .status-NotStarted, .status-Deferred, .sev-Low { background: #f3f4f6; color: #4b5563; }
+  .sev-Medium, .pri-P1 { background: #fff2cc; color: #7c5e00; }
+  .pri-P0 { background: #fce4d6; color: #8b2c0d; }
+  .pri-P2 { background: #ddebf7; color: #1f3864; }
+  .pri-P3 { background: #f3f4f6; color: #4b5563; }
+
+  /* Buttons */
+  button.primary {
+    background: #1f3864;
+    color: white;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button.primary:hover { background: #2f5597; }
+  button.secondary {
+    background: white;
+    color: #1f3864;
+    border: 1px solid #d1d5db;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button.secondary:hover { background: #f9fafb; }
+  button.icon {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 14px;
+  }
+  button.icon:hover { color: #1f3864; }
+  button.icon.danger:hover { color: #c00000; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 17px; color: #1f3864; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .field label { font-size: 12px; font-weight: 600; color: #374151; }
+  .field input, .field select, .field textarea {
+    padding: 7px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .field textarea { min-height: 60px; resize: vertical; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+  /* Chart container */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 700px) {
+    .charts-row { grid-template-columns: 1fr; }
+    .field-row { grid-template-columns: 1fr; }
+  }
+  .chart-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .chart-card h3 { margin: 0 0 8px; font-size: 13px; color: #374151; font-weight: 600; }
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .filter { display: flex; gap: 8px; align-items: center; }
+  .filter select, .filter input {
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .exec-summary {
+    background: #f9fafb;
+    border-left: 3px solid #2f5597;
+    padding: 12px 14px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .exec-summary textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    font-size: 13px;
+    color: #1f2937;
+    line-height: 1.5;
+  }
+  .exec-summary textarea:focus { outline: none; }
+  .footer-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+  /* Search bar */
+  .panel-search { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .panel-search input { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: inherit; min-width: 200px; flex: 1; }
+  /* Archive */
+  .archive-sprint { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .archive-sprint-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f9fafb; cursor: pointer; user-select: none; }
+  .archive-sprint-header:hover { background: #f3f4f6; }
+  .archive-sprint-title { font-weight: 600; color: #1f3864; flex: 1; font-size: 14px; }
+  .archive-sprint-count { font-size: 12px; color: #6b7280; background: #e5e7eb; padding: 2px 8px; border-radius: 10px; }
+  .archive-sprint-toggle { color: #9ca3af; font-size: 13px; }
+  .archive-sprint-body table { border-top: 1px solid #e5e7eb; }
+  /* Overdue */
+  tr.overdue-row > td:first-child { border-left: 3px solid #c00000; }
+  .overdue-tag { display: inline-block; background: #fce4d6; color: #8b2c0d; border-radius: 4px; font-size: 10px; font-weight: 700; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
+  .kpi.overdue .value { color: #c00000; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Weekly Project Status Dashboard</h1>
+    <div class="subtitle">Cross-functional status — completed work, upcoming priorities, and active blockers</div>
+    <div class="meta-grid">
+      <div class="meta-field">
+        <label>Reporting period</label>
+        <input id="meta-period" placeholder="Week of YYYY-MM-DD" />
+      </div>
+      <div class="meta-field">
+        <label>Prepared by</label>
+        <input id="meta-author" placeholder="Name / Team" />
+      </div>
+      <div class="meta-field">
+        <label>Sprint start date</label>
+        <input id="meta-sprintStart" type="date" />
+      </div>
+      <div class="meta-field">
+        <label>Sprint end date</label>
+        <input id="meta-sprintEnd" type="date" />
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="kpi" onclick="navigateToTab('milestones')" title="View projects"><div class="label">Projects</div><div class="value" id="kpi-projects">0</div></div>
+    <div class="kpi" onclick="navigateToTab('summary')" title="View projects"><div class="label">Avg % complete</div><div class="value" id="kpi-pct">0%</div></div>
+    <div class="kpi" onclick="navigateToTab('completed')" title="View completed tasks"><div class="label">Completed this week</div><div class="value" id="kpi-completed">0</div></div>
+    <div class="kpi" onclick="navigateToTab('upcoming')" title="View upcoming priorities"><div class="label">Upcoming</div><div class="value" id="kpi-upcoming">0</div></div>
+    <div class="kpi" onclick="navigateToTab('blockers')" title="View active blockers"><div class="label">Active blockers</div><div class="value" id="kpi-blockers">0</div></div>
+    <div class="kpi" onclick="navigateToTab('decisions')" title="View open decisions"><div class="label">Decisions open</div><div class="value" id="kpi-decisions">0</div></div>
+    <div class="kpi overdue" onclick="navigateToTab('milestones')" title="View overdue milestones"><div class="label">Overdue</div><div class="value" id="kpi-overdue">0</div><div class="sub">past target date</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Portfolio RAG distribution</h3>
+      <div class="chart-wrap"><canvas id="chart-rag"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Milestones by pipeline stage</h3>
+      <div class="chart-wrap"><canvas id="chart-stage"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="summary">Summary</button>
+    <button class="tab" data-tab="completed">Completed</button>
+    <button class="tab" data-tab="upcoming">Upcoming</button>
+    <button class="tab" data-tab="blockers">Blockers</button>
+    <button class="tab" data-tab="milestones">Project</button>
+    <button class="tab" data-tab="decisions">Decisions</button>
+    <button class="tab" data-tab="archive">Archive</button>
+  </div>
+
+  <!-- Summary panel -->
+  <section class="panel" id="panel-summary">
+    <div class="panel-header">
+      <div class="panel-title">Portfolio Rollup</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportSummaryPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportSummaryExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('projects')">+ Add project</button>
+      </div>
+    </div>
+    <div class="exec-summary">
+      <label style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Executive summary</label>
+      <textarea id="exec-summary" placeholder="2–4 sentences. Top wins, biggest risks or blockers, decisions needed from stakeholders."></textarea>
+    </div>
+    <div id="table-projects"></div>
+  </section>
+
+  <!-- Completed panel -->
+  <section class="panel" id="panel-completed" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Completed This Week</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportCompletedPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportCompletedExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('completed')">+ Add completed task</button>
+      </div>
+    </div>
+    <div class="panel-hint">Log work delivered during the reporting period. Tie each item to a milestone and capture the outcome — not just the activity.</div>
+    <div class="panel-search"><input type="text" placeholder="Search completed tasks..." oninput="filterRows('completed')" /></div>
+    <div id="table-completed"></div>
+  </section>
+
+  <!-- Upcoming panel -->
+  <section class="panel" id="panel-upcoming" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Upcoming Priorities (Next 1–2 weeks)</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportUpcomingPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportUpcomingExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('upcoming')">+ Add priority</button>
+      </div>
+    </div>
+    <div class="panel-hint">Rank by priority. Surface dependencies on other teams so partners can plan.</div>
+    <div class="panel-search"><input type="text" placeholder="Search upcoming priorities..." oninput="filterRows('upcoming')" /></div>
+    <div id="table-upcoming"></div>
+  </section>
+
+  <!-- Blockers panel -->
+  <section class="panel" id="panel-blockers" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Active Blockers & Risks</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportBlockersPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportBlockersExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('blockers')">+ Add blocker</button>
+      </div>
+    </div>
+    <div class="panel-hint">Anything actively slowing delivery. Be specific about what you need from stakeholders to unblock.</div>
+    <div class="panel-search"><input type="text" placeholder="Search blockers..." oninput="filterRows('blockers')" /></div>
+    <div id="table-blockers"></div>
+  </section>
+
+  <!-- Milestones panel -->
+  <section class="panel" id="panel-milestones" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Project Tracker</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportMilestonesPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportMilestonesExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('milestones')">+ Add project</button>
+      </div>
+    </div>
+    <div class="panel-hint">Pipeline Stage = where the work sits in delivery flow (Backlog → Done). Status = how healthy it is.</div>
+    <div class="panel-search"><input type="text" placeholder="Search milestones..." oninput="filterRows('milestones')" /></div>
+    <div id="table-milestones"></div>
+  </section>
+
+  <!-- Decisions panel -->
+  <section class="panel" id="panel-decisions" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Decisions Needed & Asks</div>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" onclick="exportDecisionsPDF()" title="Export as PDF">📄 PDF</button>
+        <button class="secondary" onclick="exportDecisionsExcel()" title="Export as Excel">📊 Excel</button>
+        <button class="primary" onclick="openModal('decisions')">+ Add decision</button>
+      </div>
+    </div>
+    <div class="panel-hint">Short, specific asks. Always include a "needed by" date.</div>
+    <div class="panel-search"><input type="text" placeholder="Search decisions..." oninput="filterRows('decisions')" /></div>
+    <div id="table-decisions"></div>
+  </section>
+
+  <!-- Archive panel -->
+  <section class="panel" id="panel-archive" style="display:none">
+    <div class="panel-header">
+      <div class="panel-title">Sprint Archive</div>
+    </div>
+    <div class="panel-hint">Completed tasks from past sprints, grouped by reporting period.</div>
+    <div id="panel-archive-content"></div>
+  </section>
+
+  <!-- Footer actions -->
+  <div class="footer-actions">
+    <button class="secondary" onclick="exportJSON()">Export JSON</button>
+    <button class="secondary" onclick="document.getElementById('import-file').click()">Import JSON</button>
+    <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importJSON(event)" />
+    <button class="secondary" onclick="startNewSprint()" title="Archive completed tasks and advance sprint dates by 2 weeks">⟳ New Sprint</button>
+    <button class="secondary" onclick="resetAll()">Reset all</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 id="modal-title"></h2>
+    <form id="modal-form"></form>
+    <div class="modal-footer">
+      <button class="secondary" onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="saveForm()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script>
+// ---------------- Data layer ----------------
+const STORAGE_KEY = "weekly_project_status_dashboard_v1";
+
+const DEFAULT_DATA = {
+  meta: { period: "", author: "", sprintStart: "", sprintEnd: "", execSummary: "" },
+  projects: [],
+  completed: [],
+  upcoming: [],
+  blockers: [],
+  milestones: [],
+  decisions: [],
+  archive: []
+};
+
+const SCHEMA_MIGRATIONS = {
+  ensureJiraTicket: (project) => {
+    if (project.jiraTicket === undefined) project.jiraTicket = "";
+    return project;
+  }
+};
+
+let state = loadState();
+let editing = null; // { collection, id } or null
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_DATA);
+    const parsed = JSON.parse(raw);
+    return { ...structuredClone(DEFAULT_DATA), ...parsed };
+  } catch (e) { return structuredClone(DEFAULT_DATA); }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  saveToServer();
+}
+
+function saveToServer() {
+  fetch('/api/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state)
+  }).catch(e => console.log('Note: Server not running, data saved locally only'));
+}
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+// ---------------- Schemas ----------------
+const SCHEMAS = {
+  projects: {
+    title: "Project",
+    fields: [
+      { name: "name", label: "Project", type: "text", required: true },
+      { name: "owner", label: "Owner", type: "text" },
+      { name: "milestone", label: "Current milestone / phase", type: "text" },
+      { name: "rag", label: "Overall RAG", type: "select", options: ["Green","Amber","Red","Blue"], default: "Green" },
+      { name: "pct", label: "% Complete", type: "number", min: 0, max: 100, default: 0 },
+      { name: "jiraTicket", label: "JIRA Ticket", type: "text" },
+      { name: "notes", label: "Notes", type: "textarea" }
+    ]
+  },
+  completed: {
+    title: "Completed task",
+    fields: [
+      { name: "project", label: "Project", type: "projectSelect", required: true },
+      { name: "milestone", label: "Milestone", type: "text" },
+      { name: "task", label: "Task / deliverable", type: "text", required: true },
+      { name: "owner", label: "Owner", type: "text" },
+      { name: "date", label: "Completed date", type: "date" },
+      { name: "outcome", label: "Outcome / impact", type: "textarea" },
+      { name: "link", label: "Link / artifact", type: "text" }
+    ]
+  },
+  upcoming: {
+    title: "Upcoming priority",
+    fields: [
+      { name: "priority", label: "Priority", type: "select", options: ["P0 - Critical","P1 - High","P2 - Medium","P3 - Low"], default: "P1 - High" },
+      { name: "project", label: "Project", type: "projectSelect", required: true },
+      { name: "milestone", label: "Milestone", type: "text" },
+      { name: "task", label: "Task / workstream", type: "text", required: true },
+      { name: "owner", label: "Owner", type: "text" },
+      { name: "target", label: "Target date", type: "date" },
+      { name: "dependencies", label: "Dependencies", type: "text" },
+      { name: "status", label: "Status", type: "select", options: ["Not started","In progress","Blocked","At risk","On track"], default: "Not started" }
+    ]
+  },
+  blockers: {
+    title: "Blocker / risk",
+    fields: [
+      { name: "project", label: "Project", type: "projectSelect", required: true },
+      { name: "milestone", label: "Milestone affected", type: "text" },
+      { name: "description", label: "Description & impact", type: "textarea", required: true },
+      { name: "severity", label: "Severity", type: "select", options: ["High","Medium","Low"], default: "Medium" },
+      { name: "owner", label: "Owner", type: "text" },
+      { name: "raised", label: "Raised on", type: "date" },
+      { name: "ask", label: "Needed from stakeholders", type: "textarea" },
+      { name: "target", label: "Target resolution", type: "date" }
+    ]
+  },
+  milestones: {
+    title: "Milestone",
+    fields: [
+      { name: "project", label: "Project", type: "projectSelect", required: true },
+      { name: "milestone", label: "Milestone", type: "text", required: true },
+      { name: "stage", label: "Pipeline stage", type: "select", options: ["Backlog","Ready for Dev","In Dev","In Review","Done"], default: "Backlog" },
+      { name: "owner", label: "Owner", type: "text" },
+      { name: "start", label: "Start date", type: "date" },
+      { name: "target", label: "Target date", type: "date" },
+      { name: "actual", label: "Actual / forecast date", type: "date" },
+      { name: "status", label: "Status", type: "select", options: ["Not started","In progress","On track","At risk","Delayed","Complete"], default: "Not started" },
+      { name: "notes", label: "Notes", type: "textarea" }
+    ]
+  },
+  decisions: {
+    title: "Decision / ask",
+    fields: [
+      { name: "project", label: "Project", type: "projectSelect", required: true },
+      { name: "decision", label: "Decision / ask", type: "textarea", required: true },
+      { name: "owner", label: "Decision owner", type: "text" },
+      { name: "needed", label: "Needed by", type: "date" },
+      { name: "status", label: "Status", type: "select", options: ["Open","In review","Decided","Deferred"], default: "Open" }
+    ]
+  }
+};
+
+// ---------------- Tabs ----------------
+function navigateToTab(tab) {
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  ["summary","completed","upcoming","blockers","milestones","decisions","archive"].forEach(t => {
+    document.getElementById("panel-" + t).style.display = (t === tab) ? "block" : "none";
+  });
+  document.getElementById("tabs").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  const tab = e.target.dataset.tab;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  ["summary","completed","upcoming","blockers","milestones","decisions","archive"].forEach(t => {
+    document.getElementById("panel-" + t).style.display = (t === tab) ? "block" : "none";
+  });
+});
+
+// ---------------- Metadata ----------------
+function bindMeta(id, key) {
+  const el = document.getElementById(id);
+  el.value = state.meta[key] || "";
+  el.addEventListener("input", () => { state.meta[key] = el.value; saveState(); });
+}
+bindMeta("meta-period", "period");
+bindMeta("meta-author", "author");
+bindMeta("meta-sprintStart", "sprintStart");
+bindMeta("meta-sprintEnd", "sprintEnd");
+const execEl = document.getElementById("exec-summary");
+execEl.value = state.meta.execSummary || "";
+execEl.addEventListener("input", () => { state.meta.execSummary = execEl.value; saveState(); });
+
+// ---------------- Modal ----------------
+function openModal(collection, id) {
+  editing = { collection, id: id || null };
+  const schema = SCHEMAS[collection];
+  document.getElementById("modal-title").textContent =
+    (id ? "Edit " : "Add ") + schema.title.toLowerCase();
+
+  const item = id ? state[collection].find(x => x.id === id) : {};
+  const form = document.getElementById("modal-form");
+  form.innerHTML = "";
+
+  schema.fields.forEach(f => {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent = f.label + (f.required ? " *" : "");
+    wrap.appendChild(label);
+
+    let input;
+    if (f.type === "textarea") {
+      input = document.createElement("textarea");
+    } else if (f.type === "select") {
+      input = document.createElement("select");
+      f.options.forEach(o => {
+        const opt = document.createElement("option");
+        opt.value = o; opt.textContent = o;
+        input.appendChild(opt);
+      });
+    } else if (f.type === "projectSelect") {
+      input = document.createElement("select");
+      const blank = document.createElement("option");
+      blank.value = ""; blank.textContent = "— select project —";
+      input.appendChild(blank);
+      state.projects.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.name; opt.textContent = p.name;
+        input.appendChild(opt);
+      });
+      // Also allow free text entry via a sibling text input
+      const free = document.createElement("input");
+      free.type = "text";
+      free.placeholder = "or type a project name";
+      free.style.marginTop = "6px";
+      free.value = item[f.name] && !state.projects.find(p => p.name === item[f.name]) ? item[f.name] : "";
+      wrap.appendChild(input);
+      wrap.appendChild(free);
+      input.name = f.name;
+      free.name = f.name + "__free";
+      if (item[f.name] && state.projects.find(p => p.name === item[f.name])) input.value = item[f.name];
+      return form.appendChild(wrap);
+    } else {
+      input = document.createElement("input");
+      input.type = f.type;
+      if (f.min !== undefined) input.min = f.min;
+      if (f.max !== undefined) input.max = f.max;
+    }
+    input.name = f.name;
+    input.value = item[f.name] !== undefined ? item[f.name] : (f.default !== undefined ? f.default : "");
+    wrap.appendChild(input);
+    form.appendChild(wrap);
+  });
+
+  document.getElementById("modal-backdrop").classList.add("open");
+}
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+  editing = null;
+}
+function syncProjectsFromMilestones() {
+  const stageToPercent = {
+    "Backlog": -25,
+    "Ready for Dev": 25,
+    "In Dev": 50,
+    "In Review": 75,
+    "Done": 100
+  };
+  const statusToRag = {
+    "Not started": "Green",
+    "In progress": "Green",
+    "On track": "Green",
+    "At risk": "Amber",
+    "Delayed": "Red",
+    "Complete": "Blue"
+  };
+
+  const projectNames = new Set(state.milestones.map(m => m.project).filter(p => p));
+  projectNames.forEach(projectName => {
+    let project = state.projects.find(p => p.name === projectName);
+    if (!project) {
+      project = { id: uid(), name: projectName, owner: "", milestone: "", rag: "Green", pct: 0, notes: "" };
+      state.projects.push(project);
+    }
+
+    const projectMilestones = state.milestones.filter(m => m.project === projectName);
+    if (projectMilestones.length > 0) {
+      const latestMilestone = projectMilestones[projectMilestones.length - 1];
+      project.milestone = latestMilestone.milestone;
+      project.owner = latestMilestone.owner;
+      project.pct = stageToPercent[latestMilestone.stage] || 0;
+      project.rag = statusToRag[latestMilestone.status] || "Green";
+    }
+  });
+}
+
+function generateExecutiveSummary() {
+  const projects = state.projects;
+  const completed = state.completed;
+  const blockers = state.blockers.filter(b => b.severity === "High" || b.severity === "Medium");
+  const openDecisions = state.decisions.filter(d => d.status === "Open" || d.status === "In review");
+
+  if (projects.length === 0) {
+    return "No projects added yet. Add projects to see a summary.";
+  }
+
+  const ragCounts = { Green: 0, Amber: 0, Red: 0, Blue: 0 };
+  projects.forEach(p => { if (ragCounts[p.rag] !== undefined) ragCounts[p.rag]++; });
+
+  const avgPct = Math.round(projects.reduce((a, p) => a + (Number(p.pct) || 0), 0) / projects.length);
+  const completedCount = completed.length;
+  const blockerCount = blockers.length;
+  const decisionCount = openDecisions.length;
+
+  let summary = "";
+
+  // Wins sentence
+  if (completedCount > 0) {
+    summary += `This week, we completed ${completedCount} milestone${completedCount !== 1 ? "s" : ""}. `;
+  }
+
+  // Portfolio health sentence
+  const redCount = ragCounts.Red;
+  const amberCount = ragCounts.Amber;
+  if (redCount > 0 || amberCount > 0) {
+    summary += `${redCount} project${redCount !== 1 ? "s" : ""} at risk (Red), ${amberCount} requiring attention (Amber). `;
+  } else {
+    summary += `All ${projects.length} projects are tracking well (Green/Blue). `;
+  }
+
+  // Blockers and decisions
+  if (blockerCount > 0 || decisionCount > 0) {
+    let issues = [];
+    if (blockerCount > 0) issues.push(`${blockerCount} active blocker${blockerCount !== 1 ? "s" : ""}`);
+    if (decisionCount > 0) issues.push(`${decisionCount} decision${decisionCount !== 1 ? "s" : ""} needed`);
+    summary += `${issues.join(" and ")} require immediate attention.`;
+  } else {
+    summary += `No critical blockers or pending decisions.`;
+  }
+
+  return summary;
+}
+
+function updateExecutiveSummary() {
+  const generated = generateExecutiveSummary();
+  const execEl = document.getElementById("exec-summary");
+  if (!execEl.value || execEl.value === state.meta.execSummary) {
+    execEl.value = generated;
+    state.meta.execSummary = generated;
+  }
+}
+
+function saveForm() {
+  if (!editing) return;
+  const { collection, id } = editing;
+  const schema = SCHEMAS[collection];
+  const form = document.getElementById("modal-form");
+  const data = id ? { ...state[collection].find(x => x.id === id) } : { id: uid() };
+
+  for (const f of schema.fields) {
+    let val;
+    if (f.type === "projectSelect") {
+      const sel = form.elements[f.name].value;
+      const free = form.elements[f.name + "__free"].value.trim();
+      val = free || sel;
+    } else {
+      val = form.elements[f.name].value;
+      if (f.type === "number") val = Number(val) || 0;
+      else val = sanitizeInput(val);
+    }
+    if (f.required && !val) {
+      alert(f.label + " is required.");
+      return;
+    }
+    data[f.name] = val;
+  }
+
+  if (id) {
+    state[collection] = state[collection].map(x => x.id === id ? data : x);
+  } else {
+    state[collection].push(data);
+  }
+  if (collection === "milestones") {
+    syncProjectsFromMilestones();
+  }
+  saveState();
+  closeModal();
+  updateExecutiveSummary();
+  renderAll();
+}
+function deleteItem(collection, id) {
+  if (!confirm("Delete this item?")) return;
+  state[collection] = state[collection].filter(x => x.id !== id);
+  if (collection === "milestones") {
+    syncProjectsFromMilestones();
+  }
+  saveState();
+  updateExecutiveSummary();
+  renderAll();
+}
+
+// ---------------- Rendering ----------------
+const BADGE_CLASS = {
+  // RAG
+  "Green": "rag-Green", "Amber": "rag-Amber", "Red": "rag-Red", "Blue": "rag-Blue",
+  // Pipeline stage
+  "Backlog": "stage-Backlog", "Ready for Dev": "stage-ReadyForDev",
+  "In Dev": "stage-InDev", "In Review": "stage-InReview", "Done": "stage-Done",
+  // Status
+  "Not started": "status-NotStarted", "In progress": "status-InProgress",
+  "On track": "status-OnTrack", "At risk": "status-AtRisk",
+  "Blocked": "status-Blocked", "Delayed": "status-Delayed",
+  "Complete": "status-Complete", "Open": "status-Open",
+  "In review": "status-InReview", "Decided": "status-Decided", "Deferred": "status-Deferred",
+  // Severity
+  "High": "sev-High", "Medium": "sev-Medium", "Low": "sev-Low",
+  // Priority
+  "P0 - Critical": "pri-P0", "P1 - High": "pri-P1",
+  "P2 - Medium": "pri-P2", "P3 - Low": "pri-P3"
+};
+function badge(value) {
+  if (!value) return "";
+  const cls = BADGE_CLASS[value] || "";
+  return `<span class="badge ${cls}">${escapeHtml(value)}</span>`;
+}
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  })[c]);
+}
+function sanitizeInput(s) {
+  return String(s ?? "").replace(/["'"']/g, '"').trim();
+}
+function rowActions(collection, id) {
+  return `
+    <button class="icon" title="Edit" onclick="openModal('${collection}','${id}')">✎</button>
+    <button class="icon danger" title="Delete" onclick="deleteItem('${collection}','${id}')">✕</button>
+  `;
+}
+function emptyState(msg) {
+  return `<div class="empty">${msg}</div>`;
+}
+
+function renderProjects() {
+
+  const t = document.getElementById("table-projects");
+
+  if (!state.projects.length) return t.innerHTML = emptyState("No projects yet. Click '+ Add project' to start.");
+  let rows = state.projects.map(p => {
+    p = SCHEMA_MIGRATIONS.ensureJiraTicket(p);
+    let jiraLink = "";
+    if (p.jiraTicket) {
+      const url = p.jiraTicket.trim();
+      const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
+      const displayText = url.split('/').pop() || 'JIRA';
+      if (isValidUrl) {
+        jiraLink = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(displayText)}</a>`;
+      } else {
+        jiraLink = escapeHtml(url);
+      }
+    }
+    return `
+    <tr>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.owner)}</td>
+      <td>${escapeHtml(p.milestone)}</td>
+      <td>${badge(p.rag)}</td>
+      <td>${(p.pct || 0) + "%"}</td>
+      <td>${jiraLink}</td>
+      <td>${escapeHtml(p.notes)}</td>
+      <td style="text-align:right">${rowActions("projects", p.id)}</td>
+    </tr>`;
+  }).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Owner</th><th>Phase / milestone</th><th>RAG</th><th>%</th><th>JIRA Ticket</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderCompleted() {
+  const t = document.getElementById("table-completed");
+  if (!state.completed.length) return t.innerHTML = emptyState("No completed tasks logged yet.");
+  let rows = state.completed.map(x => `
+    <tr>
+      <td>${escapeHtml(x.project)}</td>
+      <td>${escapeHtml(x.milestone)}</td>
+      <td>${escapeHtml(x.task)}</td>
+      <td>${escapeHtml(x.owner)}</td>
+      <td>${escapeHtml(x.date)}</td>
+      <td>${escapeHtml(x.outcome)}</td>
+      <td>${x.link ? ((x.link.trim().startsWith('http://') || x.link.trim().startsWith('https://')) ? `<a href="${x.link.trim()}" target="_blank" rel="noopener">link</a>` : escapeHtml(x.link)) : ""}</td>
+      <td style="text-align:right">${rowActions("completed", x.id)}</td>
+    </tr>`).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Milestone</th><th>Task</th><th>Owner</th><th>Date</th><th>Outcome</th><th>Link</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderUpcoming() {
+  const t = document.getElementById("table-upcoming");
+  if (!state.upcoming.length) return t.innerHTML = emptyState("No upcoming priorities yet.");
+  const order = ["P0 - Critical","P1 - High","P2 - Medium","P3 - Low"];
+  const sorted = [...state.upcoming].sort((a,b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  let rows = sorted.map(x => {
+    const over = isOverdue(x.target, x.status, ["Done"]);
+    return `
+    <tr class="${over ? 'overdue-row' : ''}">
+      <td>${badge(x.priority)}</td>
+      <td>${escapeHtml(x.project)}</td>
+      <td>${escapeHtml(x.milestone)}</td>
+      <td>${escapeHtml(x.task)}</td>
+      <td>${escapeHtml(x.owner)}</td>
+      <td>${escapeHtml(x.target)}${over ? ' <span class="overdue-tag">OVERDUE</span>' : ''}</td>
+      <td>${escapeHtml(x.dependencies)}</td>
+      <td>${badge(x.status)}</td>
+      <td style="text-align:right">${rowActions("upcoming", x.id)}</td>
+    </tr>`;
+  }).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Priority</th><th>Project</th><th>Milestone</th><th>Task</th><th>Owner</th><th>Target</th><th>Dependencies</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderBlockers() {
+  const t = document.getElementById("table-blockers");
+  if (!state.blockers.length) return t.innerHTML = emptyState("No blockers logged. 🎉");
+  const order = ["High","Medium","Low"];
+  const sorted = [...state.blockers].sort((a,b) => order.indexOf(a.severity) - order.indexOf(b.severity));
+  let rows = sorted.map(x => {
+    const over = isOverdue(x.target, x.status, []);
+    return `
+    <tr class="${over ? 'overdue-row' : ''}">
+      <td>${escapeHtml(x.project)}</td>
+      <td>${escapeHtml(x.milestone)}</td>
+      <td>${escapeHtml(x.description)}</td>
+      <td>${badge(x.severity)}</td>
+      <td>${escapeHtml(x.owner)}</td>
+      <td>${escapeHtml(x.raised)}</td>
+      <td>${escapeHtml(x.ask)}</td>
+      <td>${escapeHtml(x.target)}${over ? ' <span class="overdue-tag">OVERDUE</span>' : ''}</td>
+      <td style="text-align:right">${rowActions("blockers", x.id)}</td>
+    </tr>`;
+  }).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Milestone</th><th>Description</th><th>Severity</th><th>Owner</th><th>Raised</th><th>Needed from stakeholders</th><th>Target</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderMilestones() {
+  const t = document.getElementById("table-milestones");
+  if (!state.milestones.length) return t.innerHTML = emptyState("No milestones yet.");
+  let rows = state.milestones.map(x => {
+    const over = isOverdue(x.target, x.status, ["Complete", "Done"]);
+    return `
+    <tr class="${over ? 'overdue-row' : ''}">
+      <td>${escapeHtml(x.project)}</td>
+      <td>${escapeHtml(x.milestone)}</td>
+      <td>${badge(x.stage)}</td>
+      <td>${escapeHtml(x.owner)}</td>
+      <td>${escapeHtml(x.start)}</td>
+      <td>${escapeHtml(x.target)}${over ? ' <span class="overdue-tag">OVERDUE</span>' : ''}</td>
+      <td>${escapeHtml(x.actual)}</td>
+      <td>${badge(x.status)}</td>
+      <td>${escapeHtml(x.notes)}</td>
+      <td style="text-align:right">${rowActions("milestones", x.id)}</td>
+    </tr>`;
+  }).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Milestone</th><th>Pipeline Stage</th><th>Owner</th><th>Start</th><th>Target</th><th>Actual / forecast</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function renderDecisions() {
+  const t = document.getElementById("table-decisions");
+  if (!state.decisions.length) return t.innerHTML = emptyState("No open decisions yet.");
+  let rows = state.decisions.map(x => {
+    const over = isOverdue(x.needed, x.status, ["Decided", "Deferred"]);
+    return `
+    <tr class="${over ? 'overdue-row' : ''}">
+      <td>${escapeHtml(x.project)}</td>
+      <td>${escapeHtml(x.decision)}</td>
+      <td>${escapeHtml(x.owner)}</td>
+      <td>${escapeHtml(x.needed)}${over ? ' <span class="overdue-tag">OVERDUE</span>' : ''}</td>
+      <td>${badge(x.status)}</td>
+      <td style="text-align:right">${rowActions("decisions", x.id)}</td>
+    </tr>`;
+  }).join("");
+  t.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Decision / ask</th><th>Owner</th><th>Needed by</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+// ---------------- KPIs ----------------
+function renderKPIs() {
+  document.getElementById("kpi-projects").textContent = state.projects.length;
+  const avgPct = state.projects.length
+    ? Math.round(state.projects.reduce((a,p) => a + (Number(p.pct)||0), 0) / state.projects.length)
+    : 0;
+  document.getElementById("kpi-pct").textContent = avgPct + "%";
+  document.getElementById("kpi-completed").textContent = state.completed.length;
+  document.getElementById("kpi-upcoming").textContent = state.upcoming.length;
+  document.getElementById("kpi-blockers").textContent = state.blockers.length;
+  document.getElementById("kpi-decisions").textContent = state.decisions.filter(d => d.status === "Open" || d.status === "In review").length;
+  document.getElementById("kpi-overdue").textContent = countOverdue();
+}
+
+// ---------------- Charts ----------------
+let ragChart, stageChart;
+function renderCharts() {
+  const ragCounts = { Green: 0, Amber: 0, Red: 0, Blue: 0 };
+  state.projects.forEach(p => { if (ragCounts[p.rag] !== undefined) ragCounts[p.rag]++; });
+
+  const stageCounts = { "Backlog": 0, "Ready for Dev": 0, "In Dev": 0, "In Review": 0, "Done": 0 };
+  state.milestones.forEach(m => { if (stageCounts[m.stage] !== undefined) stageCounts[m.stage]++; });
+
+  const ragCtx = document.getElementById("chart-rag");
+  const stageCtx = document.getElementById("chart-stage");
+
+  if (ragChart) ragChart.destroy();
+  ragChart = new Chart(ragCtx, {
+    type: "doughnut",
+    data: {
+      labels: ["Green","Amber","Red","Blue"],
+      datasets: [{
+        data: [ragCounts.Green, ragCounts.Amber, ragCounts.Red, ragCounts.Blue],
+        backgroundColor: ["#548235","#bf8f00","#c00000","#2f5597"],
+        borderWidth: 0
+      }]
+    },
+    options: { plugins: { legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } } }, maintainAspectRatio: false }
+  });
+
+  if (stageChart) stageChart.destroy();
+  stageChart = new Chart(stageCtx, {
+    type: "bar",
+    data: {
+      labels: Object.keys(stageCounts),
+      datasets: [{
+        data: Object.values(stageCounts),
+        backgroundColor: ["#9ca3af","#bf8f00","#2f5597","#7b5fa8","#548235"],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } }, x: { ticks: { font: { size: 11 } } } }
+    }
+  });
+}
+
+// ---------------- Export / Import / Reset ----------------
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const period = (state.meta.period || "report").replace(/[^a-zA-Z0-9_-]+/g, "_");
+  a.download = "status_dashboard_" + period + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      state = { ...structuredClone(DEFAULT_DATA), ...parsed };
+      saveState();
+      // Refresh meta inputs
+      document.getElementById("meta-period").value = state.meta.period || "";
+      document.getElementById("meta-author").value = state.meta.author || "";
+      document.getElementById("meta-sprintStart").value = state.meta.sprintStart || "";
+      document.getElementById("meta-sprintEnd").value = state.meta.sprintEnd || "";
+      document.getElementById("exec-summary").value = state.meta.execSummary || "";
+      updateExecutiveSummary();
+      renderAll();
+    } catch (err) { alert("Could not import: " + err.message); }
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+function resetAll() {
+  if (!confirm("Reset all data? This cannot be undone.")) return;
+  state = structuredClone(DEFAULT_DATA);
+  saveState();
+  document.getElementById("meta-period").value = "";
+  document.getElementById("meta-author").value = "";
+  document.getElementById("meta-sprintStart").value = "";
+  document.getElementById("meta-sprintEnd").value = "";
+  document.getElementById("exec-summary").value = "";
+  updateExecutiveSummary();
+  renderAll();
+}
+
+// ---------------- Export to PDF/Excel ----------------
+function getMetadataRow() {
+  return [
+    ["REPORTING PERIOD", state.meta.period || ""],
+    ["PREPARED BY", state.meta.author || ""],
+    ["DATE ISSUED", state.meta.issued || ""]
+  ];
+}
+
+function formatDateForExport(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function exportTablePDF(tabName, columns, rows) {
+  try {
+    let body = `<h2>${escapeHtml(tabName)}</h2>`;
+    body += `<div class="meta">`;
+    body += `<p><strong>Reporting Period:</strong> ${escapeHtml(state.meta.period || "N/A")}</p>`;
+    body += `<p><strong>Prepared By:</strong> ${escapeHtml(state.meta.author || "N/A")}</p>`;
+    body += `<p><strong>Sprint Start Date:</strong> ${formatDateForExport(state.meta.sprintStart) || "N/A"}</p>`;
+    body += `<p><strong>Sprint End Date:</strong> ${formatDateForExport(state.meta.sprintEnd) || "N/A"}</p>`;
+    body += `</div>`;
+
+    if (state.meta.execSummary && tabName === "Summary") {
+      body += `<div class="exec-box">`;
+      body += `<p class="exec-title">Executive Summary</p>`;
+      body += `<p>${escapeHtml(state.meta.execSummary)}</p>`;
+      body += `</div>`;
+    }
+
+    body += `<table><thead><tr>`;
+    columns.forEach(col => { body += `<th>${escapeHtml(col)}</th>`; });
+    body += `</tr></thead><tbody>`;
+    rows.forEach((row, idx) => {
+      body += `<tr class="${idx % 2 === 0 ? '' : 'alt'}">`;
+      row.forEach(cell => { body += `<td>${escapeHtml(String(cell || ""))}</td>`; });
+      body += `</tr>`;
+    });
+    body += `</tbody></table>`;
+
+    const win = window.open('', '_blank');
+    if (!win) { alert("Please allow pop-ups for this page to export PDF."); return; }
+
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${escapeHtml(tabName)} - Status Dashboard</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10px; color: #222; margin: 0; }
+  h2 { color: #1f3864; border-bottom: 2px solid #1f3864; padding-bottom: 8px; margin: 0 0 12px; font-size: 14px; }
+  .meta { margin-bottom: 14px; line-height: 1.8; font-size: 11px; }
+  .meta p { margin: 2px 0; }
+  .exec-box { background: #f9fafb; border-left: 4px solid #2f5597; padding: 10px 12px; margin-bottom: 14px; font-size: 11px; }
+  .exec-title { font-weight: bold; color: #1f3864; margin: 0 0 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+  thead tr { background: #1f3864; color: white; }
+  th { border: 1px solid #333; padding: 8px 6px; text-align: left; font-weight: bold; }
+  td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+  tr.alt td { background: #f5f5f5; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>${body}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  } catch (e) {
+    console.error("PDF export error:", e);
+    alert("Error exporting PDF: " + e.message);
+  }
+}
+
+function escapeCSV(str) {
+  str = String(str || "");
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function exportTableExcel(tabName, columns, rows) {
+  try {
+    let csv = [];
+
+    csv.push(["REPORTING PERIOD", state.meta.period || ""]);
+    csv.push(["PREPARED BY", state.meta.author || ""]);
+    csv.push(["SPRINT START DATE", formatDateForExport(state.meta.sprintStart) || ""]);
+    csv.push(["SPRINT END DATE", formatDateForExport(state.meta.sprintEnd) || ""]);
+    csv.push([]);
+
+    if (state.meta.execSummary && tabName === "Summary") {
+      csv.push(["EXECUTIVE SUMMARY"]);
+      csv.push([state.meta.execSummary]);
+      csv.push([]);
+    }
+
+    csv.push(columns);
+    rows.forEach(row => {
+      csv.push(row);
+    });
+
+    const csvContent = csv.map(row =>
+      row.map(cell => escapeCSV(cell)).join(",")
+    ).join("\n");
+
+    const filename = `status_dashboard_${tabName.toLowerCase().replace(/\s+/g, "_")}_${(state.meta.period || "report").replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("Excel export error:", e);
+    alert("Error exporting: " + e.message);
+  }
+}
+
+function exportSummaryPDF() {
+  const columns = ["Project", "Owner", "Phase / Milestone", "RAG", "%", "JIRA Ticket", "Notes"];
+  const rows = state.projects.map(p => [
+    p.name, p.owner, p.milestone, p.rag, (p.pct || 0) + "%",
+    p.jiraTicket || "", p.notes
+  ]);
+  exportTablePDF("Summary", columns, rows);
+}
+
+function exportSummaryExcel() {
+  const columns = ["Project", "Owner", "Phase / Milestone", "RAG", "%", "JIRA Ticket", "Notes"];
+  const rows = state.projects.map(p => [
+    p.name, p.owner, p.milestone, p.rag, (p.pct || 0) + "%",
+    p.jiraTicket || "", p.notes
+  ]);
+  exportTableExcel("Summary", columns, rows);
+}
+
+function exportCompletedPDF() {
+  const columns = ["Project", "Milestone", "Task", "Owner", "Date", "Outcome", "Link"];
+  const rows = state.completed.map(x => [
+    x.project, x.milestone, x.task, x.owner, x.date, x.outcome, x.link || ""
+  ]);
+  exportTablePDF("Completed", columns, rows);
+}
+
+function exportCompletedExcel() {
+  const columns = ["Project", "Milestone", "Task", "Owner", "Date", "Outcome", "Link"];
+  const rows = state.completed.map(x => [
+    x.project, x.milestone, x.task, x.owner, x.date, x.outcome, x.link || ""
+  ]);
+  exportTableExcel("Completed", columns, rows);
+}
+
+function exportUpcomingPDF() {
+  const order = ["P0 - Critical","P1 - High","P2 - Medium","P3 - Low"];
+  const sorted = [...state.upcoming].sort((a,b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  const columns = ["Priority", "Project", "Milestone", "Task", "Owner", "Target", "Dependencies", "Status"];
+  const rows = sorted.map(x => [
+    x.priority, x.project, x.milestone, x.task, x.owner, x.target, x.dependencies, x.status
+  ]);
+  exportTablePDF("Upcoming", columns, rows);
+}
+
+function exportUpcomingExcel() {
+  const order = ["P0 - Critical","P1 - High","P2 - Medium","P3 - Low"];
+  const sorted = [...state.upcoming].sort((a,b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  const columns = ["Priority", "Project", "Milestone", "Task", "Owner", "Target", "Dependencies", "Status"];
+  const rows = sorted.map(x => [
+    x.priority, x.project, x.milestone, x.task, x.owner, x.target, x.dependencies, x.status
+  ]);
+  exportTableExcel("Upcoming", columns, rows);
+}
+
+function exportBlockersPDF() {
+  const order = ["High","Medium","Low"];
+  const sorted = [...state.blockers].sort((a,b) => order.indexOf(a.severity) - order.indexOf(b.severity));
+  const columns = ["Project", "Milestone", "Description", "Severity", "Owner", "Raised", "Needed from stakeholders", "Target"];
+  const rows = sorted.map(x => [
+    x.project, x.milestone, x.description, x.severity, x.owner, x.raised, x.ask, x.target
+  ]);
+  exportTablePDF("Blockers", columns, rows);
+}
+
+function exportBlockersExcel() {
+  const order = ["High","Medium","Low"];
+  const sorted = [...state.blockers].sort((a,b) => order.indexOf(a.severity) - order.indexOf(b.severity));
+  const columns = ["Project", "Milestone", "Description", "Severity", "Owner", "Raised", "Needed from stakeholders", "Target"];
+  const rows = sorted.map(x => [
+    x.project, x.milestone, x.description, x.severity, x.owner, x.raised, x.ask, x.target
+  ]);
+  exportTableExcel("Blockers", columns, rows);
+}
+
+function exportMilestonesPDF() {
+  const columns = ["Project", "Milestone", "Pipeline Stage", "Owner", "Start", "Target", "Actual / Forecast", "Status", "Notes"];
+  const rows = state.milestones.map(x => [
+    x.project, x.milestone, x.stage, x.owner, x.start, x.target, x.actual, x.status, x.notes
+  ]);
+  exportTablePDF("Milestones", columns, rows);
+}
+
+function exportMilestonesExcel() {
+  const columns = ["Project", "Milestone", "Pipeline Stage", "Owner", "Start", "Target", "Actual / Forecast", "Status", "Notes"];
+  const rows = state.milestones.map(x => [
+    x.project, x.milestone, x.stage, x.owner, x.start, x.target, x.actual, x.status, x.notes
+  ]);
+  exportTableExcel("Milestones", columns, rows);
+}
+
+function exportDecisionsPDF() {
+  const columns = ["Project", "Decision / Ask", "Owner", "Needed by", "Status"];
+  const rows = state.decisions.map(x => [
+    x.project, x.decision, x.owner, x.needed, x.status
+  ]);
+  exportTablePDF("Decisions", columns, rows);
+}
+
+function exportDecisionsExcel() {
+  const columns = ["Project", "Decision / Ask", "Owner", "Needed by", "Status"];
+  const rows = state.decisions.map(x => [
+    x.project, x.decision, x.owner, x.needed, x.status
+  ]);
+  exportTableExcel("Decisions", columns, rows);
+}
+
+// ---------------- Archive ----------------
+function renderArchive() {
+  const t = document.getElementById("panel-archive-content");
+  if (!state.archive || state.archive.length === 0) {
+    t.innerHTML = '<div class="empty">No archived sprints yet. Click "⟳ New Sprint" to archive completed tasks when starting a new sprint.</div>';
+    return;
+  }
+  const sprints = [...state.archive].reverse();
+  let html = "";
+  sprints.forEach((sprint, idx) => {
+    const items = sprint.items || [];
+    html += `
+      <div class="archive-sprint">
+        <div class="archive-sprint-header" onclick="toggleArchiveSprint(${idx})">
+          <span class="archive-sprint-title">📁 ${escapeHtml(sprint.sprint || "Sprint")}</span>
+          <span class="archive-sprint-count">${items.length} task${items.length !== 1 ? "s" : ""} completed</span>
+          <span class="archive-sprint-toggle" id="archive-toggle-${idx}">▾</span>
+        </div>
+        <div class="archive-sprint-body" id="archive-body-${idx}">`;
+    if (items.length === 0) {
+      html += '<div class="empty" style="padding:16px">No completed tasks recorded for this sprint.</div>';
+    } else {
+      html += `<table><thead><tr><th>Project</th><th>Milestone</th><th>Task</th><th>Owner</th><th>Date</th><th>Outcome</th></tr></thead><tbody>`;
+      items.forEach(x => {
+        html += `<tr>
+          <td>${escapeHtml(x.project)}</td>
+          <td>${escapeHtml(x.milestone)}</td>
+          <td>${escapeHtml(x.task)}</td>
+          <td>${escapeHtml(x.owner)}</td>
+          <td>${escapeHtml(x.date)}</td>
+          <td>${escapeHtml(x.outcome)}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    html += `</div></div>`;
+  });
+  t.innerHTML = html;
+}
+
+function toggleArchiveSprint(idx) {
+  const body = document.getElementById(`archive-body-${idx}`);
+  const toggle = document.getElementById(`archive-toggle-${idx}`);
+  const isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "";
+  toggle.textContent = isOpen ? "▸" : "▾";
+}
+
+// ---------------- Overdue & Search ----------------
+function isOverdue(dateStr, status, terminalStatuses) {
+  if (!dateStr) return false;
+  if (terminalStatuses && terminalStatuses.includes(status)) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(dateStr) < today;
+}
+
+function countOverdue() {
+  let count = 0;
+  state.upcoming.forEach(x => { if (isOverdue(x.target, x.status, ["Done"])) count++; });
+  state.milestones.forEach(x => { if (isOverdue(x.target, x.status, ["Complete", "Done"])) count++; });
+  state.blockers.forEach(x => { if (isOverdue(x.target, x.status, [])) count++; });
+  state.decisions.forEach(x => { if (isOverdue(x.needed, x.status, ["Decided", "Deferred"])) count++; });
+  return count;
+}
+
+function filterRows(panelId) {
+  const input = document.querySelector(`#panel-${panelId} .panel-search input`);
+  const search = input ? input.value.toLowerCase() : "";
+  document.querySelectorAll(`#panel-${panelId} table tbody tr`).forEach(row => {
+    row.style.display = (!search || row.textContent.toLowerCase().includes(search)) ? "" : "none";
+  });
+}
+
+function startNewSprint() {
+  if (!confirm("Start a new sprint?\n\n• Completed tasks will be archived\n• Sprint dates will advance by 2 weeks\n• All other data stays in place")) return;
+  if (!state.archive) state.archive = [];
+  state.archive.push({ sprint: state.meta.period || state.meta.sprintStart || "Sprint", items: [...state.completed] });
+  const archived = state.completed.length;
+  state.completed = [];
+  function advanceDate(d) {
+    if (!d) return "";
+    const dt = new Date(d);
+    dt.setDate(dt.getDate() + 14);
+    return dt.toISOString().split("T")[0];
+  }
+  state.meta.sprintStart = advanceDate(state.meta.sprintStart);
+  state.meta.sprintEnd = advanceDate(state.meta.sprintEnd);
+  if (state.meta.sprintStart) state.meta.period = "Week of " + state.meta.sprintStart;
+  state.meta.execSummary = "";
+  saveState();
+  refreshMetaFields();
+  updateExecutiveSummary();
+  renderAll();
+  alert(`New sprint started! ${archived} completed task(s) archived.`);
+}
+
+// ---------------- Master render ----------------
+function renderAll() {
+  renderProjects();
+  renderCompleted();
+  renderUpcoming();
+  renderBlockers();
+  renderMilestones();
+  renderDecisions();
+  renderArchive();
+  renderKPIs();
+  renderCharts();
+}
+
+function refreshMetaFields() {
+  ["meta-period", "meta-author", "meta-sprintStart", "meta-sprintEnd"].forEach(id => {
+    const key = id.replace("meta-", "").replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    const el = document.getElementById(id);
+    if (el) el.value = state.meta[key] || "";
+  });
+  const execEl = document.getElementById("exec-summary");
+  if (execEl) execEl.value = state.meta.execSummary || "";
+}
+
+async function initFromServer() {
+  try {
+    const res = await fetch('/api/load');
+    if (!res.ok) throw new Error('Server response not ok');
+    const data = await res.json();
+    if (data && Object.keys(data).length > 0) {
+      state = { ...structuredClone(DEFAULT_DATA), ...data };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      refreshMetaFields();
+      renderAll();
+      return true;
+    }
+  } catch (e) {
+    console.log('Server not available, using localStorage');
+    renderAll();
+    return false;
+  }
+  renderAll();
+}
+
+// Initialize: try server first, fall back to localStorage
+initFromServer();
+</script>
+</body>
+</html>
